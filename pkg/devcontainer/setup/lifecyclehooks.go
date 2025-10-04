@@ -5,9 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
-	"os/user"
 	"regexp"
 	"slices"
 	"strings"
@@ -85,11 +83,6 @@ func run(commands []types.LifecycleHook, remoteUser, dir string, remoteEnv map[s
 		}
 	}
 
-	remoteEnvArr := []string{}
-	for k, v := range remoteEnv {
-		remoteEnvArr = append(remoteEnvArr, k+"="+v)
-	}
-
 	for _, cmd := range commands {
 		if len(cmd) == 0 {
 			continue
@@ -97,22 +90,19 @@ func run(commands []types.LifecycleHook, remoteUser, dir string, remoteEnv map[s
 
 		for k, c := range cmd {
 			log.Infof("Run command %s: %s...", k, strings.Join(c, " "))
-			currentUser, err := user.Current()
-			if err != nil {
-				return err
-			}
-			args := []string{}
-			if remoteUser != currentUser.Username {
-				args = append(args, "su", remoteUser, "-c", command.Quote(c))
-			} else {
-				args = append(args, "sh", "-c", command.Quote(c))
-			}
 
 			// create command
-			cmd := exec.Command(args[0], args[1:]...)
+			subcmds := []string{}
+			if len(remoteEnv) > 0 {
+				exports := []string{"export"}
+				for k, v := range remoteEnv {
+					exports = append(exports, k+"="+v)
+				}
+				subcmds = append(subcmds, command.Quote(exports))
+			}
+			subcmds = append(subcmds, command.Quote(c))
+			cmd := exec.Command("su", remoteUser, "-c", strings.Join(subcmds, " && "))
 			cmd.Dir = dir
-			cmd.Env = os.Environ()
-			cmd.Env = append(cmd.Env, remoteEnvArr...)
 
 			// Create pipes for stdout and stderr
 			stdoutPipe, err := cmd.StdoutPipe()

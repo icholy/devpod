@@ -105,7 +105,7 @@ func (r *runner) setupContainer(
 		compressed,
 		workspaceConfigCompressed,
 	)
-	if runtime.GOOS == "linux" || !isDockerDriver {
+	if (runtime.GOOS == "linux" || !isDockerDriver) && os.Getenv("DEVPOD_SKIP_CHOWN") == "" {
 		setupCommand += " --chown-workspace"
 	}
 	if !isDockerDriver {
